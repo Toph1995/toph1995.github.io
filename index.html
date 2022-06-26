@@ -71,6 +71,64 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-retinaface论文浅尝" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/" class="article-date">
+  <time class="dt-published" datetime="2022-06-26T01:59:28.000Z" itemprop="datePublished">2022-06-26</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/">retinaface论文浅尝</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>论文地址：<a target="_blank" rel="noopener" href="https://arxiv.org/abs/1905.00641">https://arxiv.org/abs/1905.00641</a><br>源码：<a target="_blank" rel="noopener" href="https://github.com/biubug6/Pytorch_Retinaface">https://github.com/biubug6/Pytorch_Retinaface</a></p>
+<p>人脸检测属于目标检测的范畴，只不过其不需要判断目标的类别，只需判断每个置信框有无人脸即可。从模型结构上来讲，retinaface和yolo v3是最类似的。</p>
+<p>首先来看一下retinaface主要的idea：</p>
+<div align="center"><img src="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/1.png" width="80%"></div>
+
+<p>这个图表示输入一个图像，经过一个模型（图中没有体现，在图里是图像到方块的短短的黑色箭头），中间的立方体是指模型的输出，每一格是一个锚点，可以理解成先把图像划分成一个一个的小网格，我们去判断每个小网格中是否包含人脸如果包含人脸，再去拟合人脸框和五点信息，这里还涉及到一个multi-task,人脸和人脸库、五点特征点是监督学习，此外还有自监督人脸3d顶点信息的学习过程。</p>
+<p>一般来说，人脸检测分为两步，先判断划分的网格中是否包含人脸（positive anchor or negative anchor），在拟合人脸bounding box，两个步骤可以放到一起，只拟合positive anchor的bounding box而不用管negative anchor。可以看一下retinaface的multi-task Loss：</p>
+<div align="center"><img src="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/2.png" width="60%"></div>
+
+<p>第一项 L<del>cls</del>是判断网格中是否包含人脸，如果包含就是positive anchor，不包含就是negative anchor，是一个二分类的softmax损失，有人脸的情况p^<em>^&#x3D;1没有人脸p^</em>^&#x3D;0。第二项L<del>box</del>前面的p^<em>^是指bounding box的回归损失，可以看到前面乘了p^</em>^，也就是说只计算是人脸的损失，不是人脸就直接等于零不用管了，后面两项也是这样的。L<del>box</del>用的是和Fast R-CNN中定义的smooth-L<del>1</del>损失函数函数，长下面这样，计算box的四个点每个点和对应的gt点的smooth-L<del>1</del>值：</p>
+<div align="center"><img src="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/3.png" width="60%"></div>
+
+<p>第三项面部关键点和bbox的四点损失计算是一样的。</p>
+<p>第四项的dense regression loss，意思是把预测的形状和纹理渲染到2D平面然后和原图计算每个对应像素的L2距离，公式如下：</p>
+<div align="center"><img src="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/4.png" width="60%"></div>
+
+<h4 id="网络结构"><a href="#网络结构" class="headerlink" title="网络结构"></a>网络结构</h4><div align="center"><img src="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/5.png" width="100%"></div>
+
+<p>网络的backbone用resnet或mobilenet都可以，renest效果更好，mobilenet更加轻量级。这里用到了特征金字塔网络结构（FPN），我的理解是把backbone不同尺度的特征图倒着做卷积和上采样，融合不同尺度的特征。总之经过FPN就得到了P3,P4,P5三个特征层，同时预测，每个特征层经过SSH模块进一步加强特征提取，就是途中的context module，绿色的箭头一起指向context module不是说一起送进去，而是分别送进各自的ssh，比方说三个特征层就有3个ssh模块，SSH使用了三个并行结构，利用3x3卷积的堆叠代替5x5与7x7卷积的效果，把一次卷积和2次卷积、三次卷积的结果concate，表示在不同感受野提取的特征。</p>
+<p>最后就是计算损失和优化了。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/" data-id="cl4usqeqd0000p4rrghy03mvr" data-title="retinaface论文浅尝" class="article-share-link">Share</a>
+      
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-把火箭送上月球的卡尔曼滤波" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2022/06/25/%E6%8A%8A%E7%81%AB%E7%AE%AD%E9%80%81%E4%B8%8A%E6%9C%88%E7%90%83%E7%9A%84%E5%8D%A1%E5%B0%94%E6%9B%BC%E6%BB%A4%E6%B3%A2/" class="article-date">
@@ -94,10 +152,14 @@
     <div class="e-content article-entry" itemprop="articleBody">
       
         <p>作为控制科学与工程专业的，卡尔曼滤波应该是在我上学的时候学过的。最近因为自动驾驶和机器人好像很火的样子，复习一下。</p>
-<p>如果我们想知道汽车的位置，可以通过GPS或者说北斗定位，但是定位是存在误差的，定位实际上是一个估计值，假设是一个服从正态分布的随机变量，这也就是为什么有时候我们觉得手机定位不准。所以我们需要更多的数据估计位置，比如说陀螺仪（加速度传感器），对加速度二重积分就能得到汽车的位移，我们就能根据位移和上一时刻的位置得到当前位置，但是这个数据也是不准确的，也假设是一个服从正态分布的随机变量。如下图，蓝色的是汽车根据陀螺仪预测的位置概率密度曲线，红色的线是测量的，卡尔曼滤波就是根据这两者得到最优化状态估计，估计出更准确的值。<br><img src="/1.png" alt="img"></p>
+<p>如果我们想知道汽车的位置，可以通过GPS或者说北斗定位，但是定位是存在误差的，定位实际上是一个估计值，假设是一个服从正态分布的随机变量，这也就是为什么有时候我们觉得手机定位不准。所以我们需要更多的数据估计位置，比如说陀螺仪（加速度传感器），对加速度二重积分就能得到汽车的位移，我们就能根据位移和上一时刻的位置得到当前位置，但是这个数据也是不准确的，也假设是一个服从正态分布的随机变量。如下图，蓝色的是汽车根据陀螺仪预测的位置概率密度曲线，红色的线是测量的，卡尔曼滤波就是根据这两者得到最优化状态估计，估计出更准确的值。</p>
+<div align="center"><img src="/2022/06/25/%E6%8A%8A%E7%81%AB%E7%AE%AD%E9%80%81%E4%B8%8A%E6%9C%88%E7%90%83%E7%9A%84%E5%8D%A1%E5%B0%94%E6%9B%BC%E6%BB%A4%E6%B3%A2/1.png" width="80%"></div>
+
 <p>卡尔曼滤波计算出预测值和估计值概率分布的均值和方差，通过一个算法融合二者得到新的正态分布，这个正态分布的均值就是最优的状态估计。公式和推导过程懒得贴了，网上都查得到。实际上会有很多传感器来提高估计的精度，我们需要融合大量传感器的结果，所以卡尔曼滤波器也叫传感器融合算法。</p>
 <p>上面说的都是线性系统，实际上的系统可能是更加复杂的非线性系统，一个服从高斯分布的状态经过线性变换一定还是高斯分布，但是经过非线性变换就不是了，直接使用卡尔曼滤波会导致结果不收敛。一般可以在状态附近对函数线性近似，用雅可比矩阵用于预测和状态更新，但是这样存在一些问题，比如雅可比矩阵不好计算，数值计算成本高，只能用于可导的系统，以及高度非线性系统的线性化效果不好。</p>
-<p>有一个很妙的方法叫无损卡尔曼滤波（UFK），相比线性系统里直接用状态转移矩阵、输入控制矩阵和状态观测矩阵直接计算预测值的（或者说线性变换之后的）高斯分布的参数（均值和方差），UFK则是在当前的高斯分布中采样sigma点，然后根据非线性变换之后的sigma点计算新的均值和方差，得到新的高斯分布，这种基于经验的方法。此外，对于非线性系统，我们也可以估计其他的概率分布来提高拟合精度。<br><img src="/2.png" alt="img"></p>
+<p>有一个很妙的方法叫无损卡尔曼滤波（UFK），相比线性系统里直接用状态转移矩阵、输入控制矩阵和状态观测矩阵直接计算预测值的（或者说线性变换之后的）高斯分布的参数（均值和方差），UFK则是在当前的高斯分布中采样sigma点，然后根据非线性变换之后的sigma点计算新的均值和方差，得到新的高斯分布，这种基于经验的方法。此外，对于非线性系统，我们也可以估计其他的概率分布来提高拟合精度。</p>
+<div align="center"><img src="/2022/06/25/%E6%8A%8A%E7%81%AB%E7%AE%AD%E9%80%81%E4%B8%8A%E6%9C%88%E7%90%83%E7%9A%84%E5%8D%A1%E5%B0%94%E6%9B%BC%E6%BB%A4%E6%B3%A2/2.png" width="80%"></div>
+
 <p>卡尔曼滤波的基本思路差不多就是这样了，其中的过程和公式推导还是挺复杂的。</p>
 
       
@@ -250,6 +312,10 @@
     <h3 class="widget-title">Recent Posts</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2022/06/26/retinaface%E8%AE%BA%E6%96%87%E6%B5%85%E5%B0%9D/">retinaface论文浅尝</a>
+          </li>
         
           <li>
             <a href="/2022/06/25/%E6%8A%8A%E7%81%AB%E7%AE%AD%E9%80%81%E4%B8%8A%E6%9C%88%E7%90%83%E7%9A%84%E5%8D%A1%E5%B0%94%E6%9B%BC%E6%BB%A4%E6%B3%A2/">把火箭送上月球的卡尔曼滤波</a>
